@@ -12,25 +12,39 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
+
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.ArrayList;
 
 public class VendorActivity extends AppCompatActivity implements LocationListener {
-    private LocationManager mManager;
-    private NotificationManager mNotificationManager;
+    public MyTestReceiver receiverForTest;
     Notification notification;
     int mNotificationId = 001;
     int REQUEST_CODE = 1;
+    TelephonyManager myTelephonyManager;
+    PhoneStateListener callStateListener;
     ArrayList<String> track =new ArrayList<String>();
-
+    //Variables
+    private LocationManager mManager;
+    private NotificationManager mNotificationManager;
+    private boolean enableConnection;
+    private boolean enableGPS;
+    private FirebaseDatabase database;
+    private DatabaseReference myRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,22 +52,84 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
         setContentView(R.layout.activity_vendor);
         mManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         final LocationManager manager = (LocationManager) getSystemService( Context.LOCATION_SERVICE );
+        // Write a message to the database
+        database = FirebaseDatabase.getInstance();
+        myRef = database.getReference();
+
+
 
         if ( !manager.isProviderEnabled( LocationManager.GPS_PROVIDER ) ) {
             buildAlertMessageNoGps();
         }
 
+        myTelephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+
+        callStateListener = new PhoneStateListener() {
+            public void onDataConnectionStateChanged(int state) {
+                String stateString;
+                switch (state) {
+                    case TelephonyManager.DATA_CONNECTED:
+                        enableConnection = true;
+                        break;
+                    case TelephonyManager.DATA_DISCONNECTED:
+                        Log.i("State: ", "Offline");
+                        stateString = "Offline";
+                        enableConnection = false;
+                        Toast.makeText(getApplicationContext(),
+                                stateString, Toast.LENGTH_LONG).show();
+                        break;
+                    case TelephonyManager.DATA_SUSPENDED:
+                        Log.i("State: ", "IDLE");
+                        stateString = "Idle";
+                        Toast.makeText(getApplicationContext(),
+                                stateString, Toast.LENGTH_LONG).show();
+                        break;
+                }
+            }
+        };
+        myTelephonyManager.listen(callStateListener,
+                PhoneStateListener.LISTEN_DATA_CONNECTION_STATE);
+
+        //setupServiceReceiver();
 
     }
+
+    // Call `launchTestService()` in the activity
+    // to startup the service
+    public void launchTestService() {
+        // Construct our Intent specifying the Service
+        Intent i = new Intent(this, MyTestService.class);
+        // Add extras to the bundle
+        i.putExtra("foo", "bar");
+        // Start the service
+        startService(i);
+    }
+
+    // Setup the callback for when data is received from the service
+    public void setupServiceReceiver() {
+        receiverForTest = new MyTestReceiver(new Handler());
+        // This is where we specify what happens when data is received from the service
+        receiverForTest.setReceiver(new MyTestReceiver.Receiver() {
+            @Override
+            public void onReceiveResult(int resultCode, Bundle resultData) {
+                if (resultCode == RESULT_OK) {
+                    String resultValue = resultData.getString("resultValue");
+                    Toast.makeText(VendorActivity.this, resultValue, Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
     @Override
-    protected void onStop() {
-        super.onStop();
+    protected void onDestroy() {
+        super.onDestroy();
+        mNotificationManager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         mNotificationManager.cancel(mNotificationId);
 
     }
+
     private void buildAlertMessageNoGps() {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
         builder.setTitle("GPS State");
         builder.setMessage("Your GPS seems to be disabled, do you want to enable it?");
         builder.setCancelable(false);
@@ -89,6 +165,16 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
             return;
         }
         mManager.removeUpdates(this);
+        String finaltrack = "";
+        for (String position : track
+                ) {
+            finaltrack = finaltrack + position + "\n";
+            //Obtengo en un string grande todo lo que quedo registrado en el array y lo concateno
+        }
+        //Aquí se lo asigno a cada man en la base de datos
+        String Name = getIntent().getStringExtra("name").toString();
+        String Key = myRef.push().getKey();
+        myRef.child(Name).child(Key).setValue(finaltrack);
     }
     private void showNotification() {
         NotificationCompat.Builder mBuilder =
@@ -134,6 +220,9 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
                 showNotification();
 
                 mManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
+                launchTestService();
+            } else {
+
             }
 
     }
@@ -171,12 +260,14 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
 
     @Override
     public void onProviderEnabled(String provider) {
-
+        Toast.makeText(getApplicationContext(), "GPS conectado", Toast.LENGTH_LONG).show();
+        enableGPS = true;
     }
 
     @Override
     public void onProviderDisabled(String provider) {
         Toast.makeText(getApplicationContext(),"GPS desconectado",Toast.LENGTH_LONG).show();
+        enableGPS = false;
     }
 
     public void OnClick(View view) {

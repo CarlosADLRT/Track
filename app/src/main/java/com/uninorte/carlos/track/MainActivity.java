@@ -92,8 +92,10 @@ public class MainActivity extends AppCompatActivity {
                 GoogleSignInAccount account = result.getSignInAccount();
                 firebaseAuthWithGoogle(account);
                 Intent intent = new Intent(this,VendorActivity.class);
+                //Envio el nombre de la cuenta
                 intent.putExtra("name",account.getDisplayName());
                 startActivity(intent);
+                finish();
                 Log.d(TAG, account.getDisplayName());
             } else {
                 // Google Sign In failed, update UI appropriately
