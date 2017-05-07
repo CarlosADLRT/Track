@@ -169,6 +169,7 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
         for (String position : track
                 ) {
             finaltrack = finaltrack + position + "\n";
+            //aa
             //Obtengo en un string grande todo lo que quedo registrado en el array y lo concateno
         }
         //Aquí se lo asigno a cada man en la base de datos
