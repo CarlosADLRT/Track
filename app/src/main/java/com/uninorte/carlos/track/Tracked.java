@@ -7,13 +7,17 @@ import java.util.ArrayList;
  */
 
 public class Tracked {
-    private static ArrayList<String> track = new ArrayList<>();
+    public static ArrayList<String> track;
 
-    public static void addElemento(String string) {
-        track.add(string);
+    public Tracked(ArrayList<String> track) {
+        Tracked.track = track;
     }
 
     public static ArrayList<String> getTrack() {
         return track;
+    }
+
+    public static void setTrack(ArrayList<String> track) {
+        Tracked.track = track;
     }
 }

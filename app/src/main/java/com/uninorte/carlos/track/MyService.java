@@ -10,32 +10,62 @@ import android.content.Intent;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
+import android.os.Messenger;
+import android.os.RemoteException;
 import android.util.Log;
-
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.ArrayList;
 
 public class MyService extends Service {
+    static final int MSG_SAY_HELLO = 1;
+    /**
+     * Command to the service to register a client, receiving callbacks
+     * from the service.  The Message's replyTo field must be a Messenger of
+     * the client where callbacks should be sent.
+     */
+    static final int MSG_REGISTER_CLIENT = 1;
+    /**
+     * Command to the service to unregister a client, ot stop receiving callbacks
+     * from the service.  The Message's replyTo field must be a Messenger of
+     * the client as previously given with MSG_REGISTER_CLIENT.
+     */
+    static final int MSG_UNREGISTER_CLIENT = 2;
+    /**
+     * Command to service to set a new value.  This can be sent to the
+     * service to supply a new value, and will be sent by the service to
+     * any registered clients with the new value.
+     */
+    static final int MSG_SET_VALUE = 3;
     private static final String TAG = "BOOMBOOMTESTGPS";
     private static final int LOCATION_INTERVAL = 10000;
     private static final float LOCATION_DISTANCE = 0;
+    /**
+     * Target we publish for clients to send messages to IncomingHandler.
+     */
+    final Messenger mMessenger = new Messenger(new IncomingHandler());
+    public ArrayList<String> track;
+    /**
+     * Keeps track of all current registered clients.
+     */
+    ArrayList<Messenger> mClients = new ArrayList<Messenger>();
     LocationListener[] mLocationListeners = new LocationListener[]{
             new LocationListener(LocationManager.GPS_PROVIDER),
             new LocationListener(LocationManager.NETWORK_PROVIDER)
     };
+    /**
+     * Holds last value set by a client.
+     */
+    private int mValue = 0;
+    private String data ="";
     private LocationManager mLocationManager = null;
-    private Tracked tracked = new Tracked();
-    private ArrayList<String> track = new ArrayList<String>();
-    private FirebaseDatabase database = FirebaseDatabase.getInstance();
-    private DatabaseReference myRef = database.getReference();
     private String Name;
 
     @Override
     public IBinder onBind(Intent arg0) {
-        return null;
+        return mMessenger.getBinder();
     }
 
     @Override
@@ -44,17 +74,12 @@ public class MyService extends Service {
         //myRef = database.getReference();
         Name = (String) intent.getExtras().get("data");
         super.onStartCommand(intent, flags, startId);
-
-
         return START_STICKY;
     }
 
     @Override
     public void onCreate() {
         Log.e(TAG, "onCreate");
-
-        database = FirebaseDatabase.getInstance();
-        myRef = database.getReference();
         initializeLocationManager();
         try {
             mLocationManager.requestLocationUpdates(
@@ -79,16 +104,7 @@ public class MyService extends Service {
     @Override
     public void onDestroy() {
         Log.e(TAG, "onDestroy");
-        String finaltrack = "";
-        for (String position : track
-                ) {
-            finaltrack = finaltrack + position + "\n";
-            //aa
-            //Obtengo en un string grande todo lo que quedo registrado en el array y lo concateno
-        }
-        //Aquí se lo asigno a cada man en la base de datos
-        String Key = myRef.push().getKey();
-        myRef.child(Name).child(Key).setValue(finaltrack);
+        Log.d(TAG, "onDestroy: "+VendorActivity.data);
         super.onDestroy();
         if (mLocationManager != null) {
             for (int i = 0; i < mLocationListeners.length; i++) {
@@ -108,6 +124,29 @@ public class MyService extends Service {
         }
     }
 
+    class IncomingHandler extends Handler {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case MSG_REGISTER_CLIENT:
+                    mClients.add(msg.replyTo);
+                    break;
+                case MSG_UNREGISTER_CLIENT:
+                    mClients.remove(msg.replyTo);
+                    break;
+                case MSG_SET_VALUE:
+                    mValue = msg.arg1;
+
+                    for (int i = mClients.size() - 1; i >= 0; i--) {
+
+                    }
+                    break;
+                default:
+                    super.handleMessage(msg);
+            }
+        }
+    }
+
     private class LocationListener implements android.location.LocationListener {
         Location mLastLocation;
 
@@ -123,7 +162,21 @@ public class MyService extends Service {
             Double latitud = location.getLatitude();
             Double altitud = location.getAltitude();
             Double longitude = location.getLongitude();
-            track.add(latitud.toString() + "-" + altitud.toString() + "+" + longitude.toString());
+            data = data + latitud.toString() + "*" + altitud.toString() + "*" + longitude.toString() + "|";
+            for (int i = mClients.size() - 1; i >= 0; i--) {
+                try {
+                    //Send data as a String
+                    Bundle b = new Bundle();
+                    b.putString("str1", data);
+                    Message msg = Message.obtain(null, MSG_SET_VALUE);
+                    msg.setData(b);
+                    mClients.get(i).send(msg);
+                } catch (RemoteException e) {
+                    // The client is dead. Remove it from the list; we are going through the list from back to front so this is safe to do inside the loop.
+                    mClients.remove(i);
+                }
+            }
+
         }
 
 
