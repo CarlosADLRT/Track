@@ -12,7 +12,6 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
-import android.os.Handler;
 import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NotificationCompat;
@@ -31,7 +30,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import java.util.ArrayList;
 
 public class VendorActivity extends AppCompatActivity implements LocationListener {
-    public MyTestReceiver receiverForTest;
+
     Notification notification;
     int mNotificationId = 001;
     int REQUEST_CODE = 1;
@@ -45,6 +44,7 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
     private boolean enableGPS;
     private FirebaseDatabase database;
     private DatabaseReference myRef;
+    private Tracked tracked = new Tracked();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,36 +89,9 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
         };
         myTelephonyManager.listen(callStateListener,
                 PhoneStateListener.LISTEN_DATA_CONNECTION_STATE);
-
-        //setupServiceReceiver();
-
     }
 
-    // Call `launchTestService()` in the activity
-    // to startup the service
-    public void launchTestService() {
-        // Construct our Intent specifying the Service
-        Intent i = new Intent(this, MyTestService.class);
-        // Add extras to the bundle
-        i.putExtra("foo", "bar");
-        // Start the service
-        startService(i);
-    }
 
-    // Setup the callback for when data is received from the service
-    public void setupServiceReceiver() {
-        receiverForTest = new MyTestReceiver(new Handler());
-        // This is where we specify what happens when data is received from the service
-        receiverForTest.setReceiver(new MyTestReceiver.Receiver() {
-            @Override
-            public void onReceiveResult(int resultCode, Bundle resultData) {
-                if (resultCode == RESULT_OK) {
-                    String resultValue = resultData.getString("resultValue");
-                    Toast.makeText(VendorActivity.this, resultValue, Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-    }
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -164,18 +137,10 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        mManager.removeUpdates(this);
-        String finaltrack = "";
-        for (String position : track
-                ) {
-            finaltrack = finaltrack + position + "\n";
-            //aa
-            //Obtengo en un string grande todo lo que quedo registrado en el array y lo concateno
-        }
-        //Aquí se lo asigno a cada man en la base de datos
-        String Name = getIntent().getStringExtra("name").toString();
-        String Key = myRef.push().getKey();
-        myRef.child(Name).child(Key).setValue(finaltrack);
+        Intent ir = new Intent(this, MyService.class);
+
+        stopService(ir);
+
     }
     private void showNotification() {
         NotificationCompat.Builder mBuilder =
@@ -219,9 +184,14 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
         boolean enabled = mManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
             if(enabled){
                 showNotification();
+                Intent ir = new Intent(this, MyService.class);
 
-                mManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
-                launchTestService();
+                String Name = getIntent().getStringExtra("name").toString();
+
+                ir.putExtra("data", Name);
+                startService(ir);
+
+                //mManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
             } else {
 
             }
