@@ -4,6 +4,8 @@ package com.uninorte.carlos.track;
  * Created by carlos on 7/05/17.
  */
 
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -15,12 +17,13 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.TaskStackBuilder;
 import android.util.Log;
 
 import java.util.ArrayList;
 
 public class MyService extends Service {
-    static final int MSG_SAY_HELLO = 1;
     /**
      * Command to the service to register a client, receiving callbacks
      * from the service.  The Message's replyTo field must be a Messenger of
@@ -40,7 +43,7 @@ public class MyService extends Service {
      */
     static final int MSG_SET_VALUE = 3;
     private static final String TAG = "BOOMBOOMTESTGPS";
-    private static final int LOCATION_INTERVAL = 10000;
+    private static final int LOCATION_INTERVAL = 180000;
     private static final float LOCATION_DISTANCE = 0;
     /**
      * Target we publish for clients to send messages to IncomingHandler.
@@ -55,6 +58,8 @@ public class MyService extends Service {
             new LocationListener(LocationManager.GPS_PROVIDER),
             new LocationListener(LocationManager.NETWORK_PROVIDER)
     };
+    private NotificationManager mNotificationManager;
+    private int mNotificationId = 001;
     /**
      * Holds last value set by a client.
      */
@@ -71,8 +76,6 @@ public class MyService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.e(TAG, "onStartCommand");
-        //myRef = database.getReference();
-        Name = (String) intent.getExtras().get("data");
         super.onStartCommand(intent, flags, startId);
         return START_STICKY;
     }
@@ -80,6 +83,7 @@ public class MyService extends Service {
     @Override
     public void onCreate() {
         Log.e(TAG, "onCreate");
+        showNotification();
         initializeLocationManager();
         try {
             mLocationManager.requestLocationUpdates(
@@ -104,7 +108,8 @@ public class MyService extends Service {
     @Override
     public void onDestroy() {
         Log.e(TAG, "onDestroy");
-        Log.d(TAG, "onDestroy: "+VendorActivity.data);
+        mNotificationManager.cancel(mNotificationId);
+
         super.onDestroy();
         if (mLocationManager != null) {
             for (int i = 0; i < mLocationListeners.length; i++) {
@@ -122,6 +127,37 @@ public class MyService extends Service {
         if (mLocationManager == null) {
             mLocationManager = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
         }
+    }
+
+    private void showNotification() {
+        NotificationCompat.Builder mBuilder =
+                new NotificationCompat.Builder(this)
+                        .setSmallIcon(R.mipmap.ic_launcher)
+                        .setContentTitle("Track Start")
+                        .setOngoing(true)
+                        .setContentText("The tracking is running");
+        // Creates an explicit intent for an Activity in your app
+        Intent resultIntent = new Intent(this, VendorActivity.class);
+
+        // The stack builder object will contain an artificial back stack for the
+        // started Activity.
+        // This ensures that navigating backward from the Activity leads out of
+        // your application to the Home screen.
+        TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
+        // Adds the back stack for the Intent (but not the Intent itself)
+        stackBuilder.addParentStack(VendorActivity.class);
+        // Adds the Intent that starts the Activity to the top of the stack
+        stackBuilder.addNextIntent(resultIntent);
+        PendingIntent resultPendingIntent =
+                stackBuilder.getPendingIntent(
+                        0,
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                );
+        mBuilder.setContentIntent(resultPendingIntent);
+        mNotificationManager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        // mId allows you to update the notification later on.
+        mNotificationManager.notify(mNotificationId, mBuilder.build());
     }
 
     class IncomingHandler extends Handler {
@@ -159,10 +195,10 @@ public class MyService extends Service {
         public void onLocationChanged(Location location) {
             Log.e(TAG, "onLocationChanged: " + location);
             mLastLocation.set(location);
+
             Double latitud = location.getLatitude();
-            Double altitud = location.getAltitude();
             Double longitude = location.getLongitude();
-            data = data + latitud.toString() + "*" + altitud.toString() + "*" + longitude.toString() + "|";
+            data = latitud.toString() + "|" + longitude.toString();
             for (int i = mClients.size() - 1; i >= 0; i--) {
                 try {
                     //Send data as a String
