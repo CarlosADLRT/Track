@@ -43,7 +43,7 @@ public class MyService extends Service {
      */
     static final int MSG_SET_VALUE = 3;
     private static final String TAG = "BOOMBOOMTESTGPS";
-    private static final int LOCATION_INTERVAL = 180000;
+    private static final int LOCATION_INTERVAL = 120000;
     private static final float LOCATION_DISTANCE = 0;
     /**
      * Target we publish for clients to send messages to IncomingHandler.

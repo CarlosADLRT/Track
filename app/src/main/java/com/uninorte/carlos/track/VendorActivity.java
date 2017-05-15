@@ -293,7 +293,6 @@ public class VendorActivity extends AppCompatActivity implements LocationListene
             switch (msg.what) {
                 case MyService.MSG_SET_VALUE:
                     String str1 = msg.getData().getString("str1");
-                    Log.d("VendorActivityTag", "handleMessage: " + str1);
                     int index = str1.indexOf("|");
                     String latitud = str1.substring(0, index);
                     String longitud = str1.substring(index + 1, str1.length());
